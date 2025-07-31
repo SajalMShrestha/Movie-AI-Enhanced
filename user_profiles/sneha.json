@@ -1,0 +1,52 @@
+{
+  "user_id": "sneha",
+  "created_at": "2025-07-31T13:45:43.503430",
+  "last_updated": "2025-07-31T13:45:43.522411",
+  "demographics": {
+    "name": "Sneha Pradhan",
+    "email": "sneha91pradhan@gmail.com",
+    "username": "sneha",
+    "age_range": "25-40",
+    "location": "Urban/Suburban",
+    "interests": [
+      "arts",
+      "design",
+      "creativity",
+      "culture"
+    ]
+  },
+  "life_context": {
+    "career_stage": "creative_professional",
+    "stress_level": "medium",
+    "free_time": "moderate",
+    "viewing_preferences": [
+      "artistic",
+      "visually_stunning",
+      "narrative_rich"
+    ]
+  },
+  "taste_profile": {
+    "genre_weights": {
+      "drama": 0.9,
+      "comedy": 0.7,
+      "romance": 0.6,
+      "foreign": 0.5,
+      "indie": 0.8
+    },
+    "cast_preferences": {},
+    "director_preferences": {},
+    "mood_preferences": {
+      "artistic": 0.9,
+      "emotional": 0.7,
+      "inspiring": 0.6
+    }
+  },
+  "usage_stats": {
+    "total_logins": 2,
+    "last_login": "2025-07-31T13:45:43.522411",
+    "total_sessions": 1,
+    "total_recommendations_requested": 0
+  },
+  "feedback_count": 0,
+  "learning_history": []
+}
