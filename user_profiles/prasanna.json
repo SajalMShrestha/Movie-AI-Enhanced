@@ -1,0 +1,52 @@
+{
+  "user_id": "prasanna",
+  "created_at": "2025-07-31T15:20:22.513543",
+  "last_updated": "2025-07-31T15:20:22.536026",
+  "demographics": {
+    "name": "Prasanna Shrestha",
+    "email": "prasanna.shrestha@gmail.com",
+    "username": "prasanna",
+    "age_range": "30-50",
+    "location": "Urban",
+    "interests": [
+      "business",
+      "leadership",
+      "success",
+      "networking"
+    ]
+  },
+  "life_context": {
+    "career_stage": "business_owner",
+    "stress_level": "high",
+    "free_time": "limited",
+    "viewing_preferences": [
+      "leadership_lessons",
+      "success_stories",
+      "entertainment"
+    ]
+  },
+  "taste_profile": {
+    "genre_weights": {
+      "drama": 0.7,
+      "thriller": 0.8,
+      "comedy": 0.6,
+      "biography": 0.7,
+      "action": 0.5
+    },
+    "cast_preferences": {},
+    "director_preferences": {},
+    "mood_preferences": {
+      "motivational": 0.8,
+      "entertaining": 0.7,
+      "thought_provoking": 0.6
+    }
+  },
+  "usage_stats": {
+    "total_logins": 2,
+    "last_login": "2025-07-31T15:20:22.535030",
+    "total_sessions": 1,
+    "total_recommendations_requested": 0
+  },
+  "feedback_count": 0,
+  "learning_history": []
+}

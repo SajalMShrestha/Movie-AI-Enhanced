@@ -8,6 +8,87 @@ from tmdbv3api import TMDb, Movie
 from typing import List, Tuple, Dict, Any
 import streamlit as st
 from datetime import datetime
+import time  # Add this line
+
+def get_tmdb_keyword_ids(keyword_text: str, tmdb_api_key: str) -> List[int]:
+    """Get TMDb keyword IDs from text search."""
+    try:
+        url = "https://api.themoviedb.org/3/search/keyword"
+        params = {
+            "api_key": tmdb_api_key,
+            "query": keyword_text
+        }
+        
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            keywords = response.json().get("results", [])
+            print(f"🔑 DEBUG: Found {len(keywords)} keywords for '{keyword_text}': {[kw['name'] for kw in keywords[:3]]}")
+            # Return first 3 most relevant keyword IDs
+            return [kw["id"] for kw in keywords[:3]]
+        else:
+            print(f"❌ DEBUG: Keyword search failed for '{keyword_text}': {response.status_code}")
+        
+        return []
+    except Exception as e:
+        print(f"❌ DEBUG: Error searching keywords for '{keyword_text}': {e}")
+        return []
+
+def get_contextual_keywords_for_user(username: str, tmdb_api_key: str) -> str:
+    """Get comma-separated keyword IDs for user's personality/mood."""
+    user_keywords = {
+        'sajal': ['business', 'leadership', 'entrepreneur'],
+        'sneha': ['family', 'children', 'creative'],
+        'prasanna': ['entrepreneur', 'adventure', 'outdoors'],
+        'neha': ['mystery', 'investigation', 'analysis'],
+        'dilasha': ['career', 'ambition', 'professional'],
+        'shreish': ['nostalgia', 'childhood', 'classic']
+    }
+    
+    keyword_ids = []
+    user_keyword_list = user_keywords.get(username, [])
+    
+    print(f"🔑 DEBUG: Getting keywords for {username}: {user_keyword_list}")
+    
+    for keyword_text in user_keyword_list:
+        ids = get_tmdb_keyword_ids(keyword_text, tmdb_api_key)
+        keyword_ids.extend(ids)
+        
+        # Add small delay to avoid rate limiting
+        import time
+        time.sleep(0.1)
+    
+    # Remove duplicates and limit to 5 keywords
+    unique_keyword_ids = list(set(keyword_ids))[:5]
+    result = ",".join(str(id) for id in unique_keyword_ids)
+    
+    print(f"🔑 DEBUG: Final keyword IDs for {username}: {result}")
+    return result
+
+def get_user_contextual_mapping(username: str) -> Dict[str, str]:
+    """Get contextual genre mapping for specific users (keywords handled separately)."""
+    
+    contextual_mappings = {
+        'sajal': {
+            'genres': '18,99,36',  # Drama, Documentary, History
+        },
+        'sneha': {
+            'genres': '10751,16,18',  # Family, Animation, Drama
+        },
+        'prasanna': {
+            'genres': '12,28,18',  # Adventure, Action, Biography
+        },
+        'neha': {
+            'genres': '9648,53,99',  # Mystery, Thriller, Documentary
+        },
+        'dilasha': {
+            'genres': '18,53,80',  # Drama, Thriller, Crime
+        },
+        'shreish': {
+            'genres': '10751,35,12',  # Family, Comedy, Adventure
+        }
+    }
+    
+    return contextual_mappings.get(username, {})
 
 def recommend_movies_with_profile(favorite_titles: List[str], user_profile: Dict[str, Any]) -> Tuple[List[Tuple[str, float]], Dict[str, Tuple[Any, float]]]:
     """Generate personalized movie recommendations based on user profile."""
@@ -350,11 +431,119 @@ def recommend_movies_with_profile(favorite_titles: List[str], user_profile: Dict
     print(f"🎬 DEBUG: Director discovery added {director_discovery_count} new movies")
     print(f"🎬 DEBUG: After director discovery: {len(candidate_movies)} total candidates")
 
+    # Strategy 4: Contextual Discovery (Personality + Mood)
+    print(f"\n🎭 DEBUG: STARTING contextual discovery")
+
+    contextual_discovery_count = 0
+    user_contextual_config = get_user_contextual_mapping(st.session_state.current_user)
+
+    if user_contextual_config:
+        try:
+            print(f"🎭 DEBUG: Contextual config for {st.session_state.current_user}: {user_contextual_config}")
+            
+            # Get dynamic keyword IDs
+            keyword_ids = get_contextual_keywords_for_user(st.session_state.current_user, tmdb.api_key)
+            
+            url = f"https://api.themoviedb.org/3/discover/movie"
+            
+            # Try keywords-only and genres-only separately
+            all_movies = []
+
+            # Keywords-only search
+            if keyword_ids:
+                params_keywords = {
+                    "api_key": tmdb.api_key,
+                    "with_keywords": keyword_ids,
+                    "sort_by": "popularity.desc",
+                    "vote_count.gte": 50,
+                    "include_adult": False,
+                    "page": 1
+                }
+                
+                print(f"🔑 DEBUG: Trying keywords-only: {keyword_ids}")
+                response = requests.get(url, params=params_keywords)
+                
+                print(f"🔍 DEBUG: Keywords-only API URL: {url}")
+                print(f"🔍 DEBUG: Keywords-only params: {params_keywords}")
+                print(f"🔍 DEBUG: Keywords response: {response.json()}")
+                
+                if response.status_code == 200:
+                    keyword_movies = response.json().get("results", [])
+                    print(f"🎭 DEBUG: Found {len(keyword_movies)} movies with keywords-only")
+                    all_movies.extend(keyword_movies[:8])
+
+            # Genres-only search
+            params_genres = {
+                "api_key": tmdb.api_key,
+                "with_genres": user_contextual_config['genres'],
+                "sort_by": "popularity.desc",
+                "vote_count.gte": 50,
+                "include_adult": False,
+                "page": 1
+            }
+
+            print(f"🎭 DEBUG: Trying genres-only: {user_contextual_config['genres']}")
+            response = requests.get(url, params=params_genres)
+
+            if response.status_code == 200:
+                genre_movies = response.json().get("results", [])
+                print(f"🎭 DEBUG: Found {len(genre_movies)} movies with genres-only")
+                all_movies.extend(genre_movies[:7])
+
+            # Remove duplicates and use combined results
+            unique_movies = []
+            seen_ids = set()
+            for movie_data in all_movies:
+                if movie_data["id"] not in seen_ids:
+                    unique_movies.append(movie_data)
+                    seen_ids.add(movie_data["id"])
+
+            movies = unique_movies
+            print(f"🎭 DEBUG: Total unique contextual movies: {len(movies)}")
+            
+            # Process the movies
+            for movie_data in movies[:15]:  # 15 contextual recommendations
+                try:
+                    movie = movie_api.details(movie_data["id"])
+                    
+                    if movie.title in candidate_movies:
+                        continue
+                    
+                    if movie.title not in favorite_titles:
+                        print(f"   🎭 Contextual discovery found: {movie.title}")
+                        contextual_discovery_count += 1
+                        
+                        score = calculate_personalized_score(
+                            movie, 
+                            genre_weights, 
+                            cast_preferences, 
+                            director_preferences,
+                            mood_preferences,
+                            career_stage,
+                            stress_level,
+                            favorite_genres,
+                            favorite_cast,
+                            favorite_directors
+                        )
+
+                        candidate_movies[movie.title] = (movie, score)
+                    
+                except Exception as e:
+                    print(f"   ❌ Error processing contextual movie {movie_data.get('title', 'Unknown')}: {e}")
+                    continue
+                    
+        except Exception as e:
+            print(f"❌ DEBUG: Error in contextual discovery: {e}")
+
+    print(f"🎭 DEBUG: Contextual discovery added {contextual_discovery_count} new movies")
+    print(f"🎭 DEBUG: After contextual discovery: {len(candidate_movies)} total candidates")
+
     # Final summary
     print(f"\n🏆 DEBUG: DISCOVERY SUMMARY:")
     print(f"   Genre discovery: 26 candidates (from previous debug)")
     print(f"   Cast discovery: +{cast_discovery_count} candidates")
     print(f"   Director discovery: +{director_discovery_count} candidates")
+    print(f"   Contextual discovery: +{contextual_discovery_count} candidates")
     print(f"   Total final candidates: {len(candidate_movies)}")
 
     # Sample high-quality candidates
@@ -420,9 +609,27 @@ def calculate_personalized_score(
     if movie_genres:
         genre_score = genre_score / len(movie_genres)
     
-    # Calculate dynamic genre weight based on user's specific preferences
+    # Boost profile-driven scoring
+    profile_weight = 0.6  # 60% of total score from profile
+    favorites_weight = 0.4  # 40% from favorites matching
+    
+    # Genre scoring with much higher profile influence
+    genre_profile_score = 0
+    genre_similarity_score = 0
+    
+    for genre in movie_genres:
+        # Profile-based scoring (60% weight)
+        if genre.lower() in genre_weights:
+            genre_profile_score += genre_weights[genre.lower()]
+        
+        # Favorites similarity scoring (40% weight)
+        if genre.lower() in favorite_genres:
+            genre_similarity_score += 0.3
+    
+    # Combine profile and favorites scoring
     total_genre_weight = sum(genre_weights.values()) / len(genre_weights) if genre_weights else 0.4
-    score += genre_score * total_genre_weight
+    final_genre_score = (genre_profile_score * profile_weight) + (genre_similarity_score * favorites_weight)
+    score += final_genre_score * total_genre_weight
     max_score += total_genre_weight
     
     # Cast matching (25% weight)
@@ -454,9 +661,21 @@ def calculate_personalized_score(
     except:
         pass
     
+    # Cast scoring with profile-driven approach
+    cast_profile_score = 0
+    cast_similarity_score = 0
+    
+    if cast_count > 0:
+        # Profile-based cast scoring (60% weight)
+        cast_profile_score = cast_score * profile_weight
+        
+        # Favorites similarity scoring (40% weight)
+        cast_similarity_score = cast_score * favorites_weight
+    
     # Dynamic cast weight - higher if user has strong cast preferences
     cast_weight = 0.4 if cast_preferences else 0.15  # More weight if user has learned preferences
-    score += cast_score * cast_weight
+    final_cast_score = cast_profile_score + cast_similarity_score
+    score += final_cast_score * cast_weight
     max_score += cast_weight
     
     # Director matching (15% weight)
@@ -485,7 +704,12 @@ def calculate_personalized_score(
     except:
         pass
     
-    score += director_score * 0.15
+    # Director scoring with profile-driven approach
+    director_profile_score = director_score * profile_weight
+    director_similarity_score = director_score * favorites_weight
+    final_director_score = director_profile_score + director_similarity_score
+    
+    score += final_director_score * 0.15
     max_score += 0.15
     
     # Popularity and rating (10% weight)
@@ -525,6 +749,29 @@ def calculate_personalized_score(
     mood_weight = 0.2  # Give mood preferences significant weight
     score += mood_score * mood_weight
     max_score += mood_weight
+    
+    # NEW: Contextual discovery bonus (15% weight)
+    contextual_score = 0.0
+    username = st.session_state.get('current_user', '')
+    user_contextual = get_user_contextual_mapping(username)
+
+    if user_contextual and movie_genres:
+        contextual_genres = user_contextual.get('genres', '').split(',')
+        contextual_keywords = user_contextual.get('keywords', '').split(',')
+        
+        # Check genre matches
+        for genre in movie_genres:
+            genre_id = get_genre_id(genre)
+            if genre_id in contextual_genres:
+                contextual_score += 0.3
+        
+        # Normalize contextual score
+        if contextual_score > 0:
+            contextual_score = min(contextual_score / len(movie_genres), 1.0)
+
+    contextual_weight = 0.15  # 15% weight for contextual discovery
+    score += contextual_score * contextual_weight
+    max_score += contextual_weight
     
     # Career stage and stress level adjustments (10% weight)
     context_score = 0.0
